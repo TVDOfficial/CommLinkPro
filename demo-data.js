@@ -9,17 +9,17 @@ console.log('📻 Adding demo data to Radio Registry...\n');
 // Demo radio data with mining-specific fields
 const demoRadios = [
   {
-    serial_number: 'MTR001',
-    model: 'Motorola CP200',
-    version: 'v2.1',
+    serial_number: 'TP001',
+    radio_id: '12345',
+    model: 'Tait TP9300',
+    version: 'v3.0',
     user_name: 'John Smith',
     department: 'Security',
     location: 'Main Gate',
-    site_code: 'MINE-A',
     shift: 'Day Shift',
     status: 'active',
     operator_name: 'Demo System',
-    notes: 'Primary security radio for main entrance'
+    notes: 'Handheld radio for security operations'
   },
   {
     serial_number: 'MTR002',
@@ -204,11 +204,11 @@ async function addDemoData() {
       
       await new Promise((resolve, reject) => {
         db.run(
-          `INSERT INTO radios (id, serial_number, model, version, user_name, department, location, 
-                              site_code, shift, status, notes, operator_name, created_by_ip) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, radio.serial_number, radio.model, radio.version, radio.user_name, 
-           radio.department, radio.location, radio.site_code, radio.shift, 
+                `INSERT INTO radios (id, serial_number, radio_id, model, version, user_name, department, location, 
+                          shift, status, notes, operator_name, created_by_ip)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, radio.serial_number, radio.radio_id, radio.model, radio.version, radio.user_name, 
+       radio.department, radio.location, radio.shift, 
            radio.status, radio.notes, radio.operator_name, '127.0.0.1'],
           function(err) {
             if (err) {

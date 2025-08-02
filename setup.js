@@ -41,12 +41,12 @@ if (!fs.existsSync(dbPath)) {
     db.run(`CREATE TABLE IF NOT EXISTS radios (
       id TEXT PRIMARY KEY,
       serial_number TEXT UNIQUE NOT NULL,
+      radio_id TEXT,
       model TEXT NOT NULL,
       version TEXT,
       user_name TEXT,
       department TEXT,
       location TEXT,
-      site_code TEXT,
       shift TEXT,
       status TEXT DEFAULT 'active',
       notes TEXT,

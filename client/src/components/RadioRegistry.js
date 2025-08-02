@@ -20,12 +20,12 @@ import {
 const RadioRegistry = () => {
   const [formData, setFormData] = useState({
     serial_number: '',
+    radio_id: '',
     model: '',
     version: '',
     user_name: '',
     department: '',
     location: '',
-    site_code: '',
     shift: '',
     status: 'active',
     notes: '',
@@ -36,6 +36,10 @@ const RadioRegistry = () => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [recentRadios, setRecentRadios] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [bulkData, setBulkData] = useState('');
 
   const departments = [
     'Operations', 'Maintenance', 'Safety', 'Security', 'Logistics', 
@@ -46,6 +50,7 @@ const RadioRegistry = () => {
 
   useEffect(() => {
     fetchRecentRadios();
+    fetchTemplates();
     const savedOperator = localStorage.getItem('operatorName');
     if (savedOperator) {
       setFormData(prev => ({ ...prev, operator_name: savedOperator }));
@@ -58,6 +63,15 @@ const RadioRegistry = () => {
       setRecentRadios(response.data.slice(0, 3));
     } catch (error) {
       console.error('Error fetching recent radios:', error);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const response = await axios.get('/api/templates');
+      setTemplates(response.data);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
     }
   };
 
@@ -119,12 +133,12 @@ const RadioRegistry = () => {
       // Reset form
       setFormData({
         serial_number: '',
+        radio_id: '',
         model: '',
         version: '',
         user_name: '',
         department: '',
         location: '',
-        site_code: '',
         shift: '',
         status: 'active',
         notes: '',
@@ -153,12 +167,12 @@ const RadioRegistry = () => {
     if (duplicateRadio) {
       setFormData({
         serial_number: duplicateRadio.serial_number,
+        radio_id: duplicateRadio.radio_id || '',
         model: duplicateRadio.model,
         version: duplicateRadio.version || '',
         user_name: duplicateRadio.user_name || '',
         department: duplicateRadio.department || '',
         location: duplicateRadio.location || '',
-        site_code: duplicateRadio.site_code || '',
         shift: duplicateRadio.shift || '',
         status: duplicateRadio.status || 'active',
         notes: duplicateRadio.notes || '',
@@ -173,12 +187,12 @@ const RadioRegistry = () => {
   const handleCancel = () => {
     setFormData({
       serial_number: '',
+      radio_id: '',
       model: '',
       version: '',
       user_name: '',
       department: '',
       location: '',
-      site_code: '',
       shift: '',
       status: 'active',
       notes: '',
@@ -187,6 +201,81 @@ const RadioRegistry = () => {
     setDuplicateRadio(null);
     setEditMode(false);
     setShowDuplicateModal(false);
+  };
+
+  const handleBulkImport = async () => {
+    if (!formData.operator_name.trim()) {
+      toast.error('Please enter your name first');
+      return;
+    }
+
+    if (!bulkData.trim()) {
+      toast.error('Please enter radio data for bulk import');
+      return;
+    }
+
+    try {
+      // Parse CSV-like data
+      const lines = bulkData.trim().split('\n');
+      const radios = [];
+
+      for (const line of lines) {
+        const fields = line.split(',').map(field => field.trim());
+        if (fields.length >= 2) {
+          radios.push({
+            serial_number: fields[0],
+            radio_id: fields[1] || '',
+            model: fields[2] || '',
+            version: fields[3] || '',
+            user_name: fields[4] || '',
+            department: fields[5] || '',
+            location: fields[6] || '',
+            shift: fields[7] || '',
+            status: fields[8] || 'active',
+            notes: fields[9] || ''
+          });
+        }
+      }
+
+      if (radios.length === 0) {
+        toast.error('No valid radio data found');
+        return;
+      }
+
+      setLoading(true);
+      const response = await axios.post('/api/radios/bulk', {
+        radios,
+        operator_name: formData.operator_name
+      });
+
+      toast.success(`Bulk import completed: ${response.data.successCount} successful, ${response.data.errorCount} errors`);
+      
+      if (response.data.errors && response.data.errors.length > 0) {
+        console.log('Import errors:', response.data.errors);
+      }
+
+      setBulkData('');
+      setShowBulkImport(false);
+      fetchRecentRadios();
+
+    } catch (error) {
+      toast.error('Bulk import failed');
+      console.error('Bulk import error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUseTemplate = (template) => {
+    setFormData(prev => ({
+      ...prev,
+      model: template.model,
+      version: template.version,
+      status: template.status,
+      notes: template.notes
+    }));
+    setShowTemplates(false);
+    toast.success(`Applied ${template.name} template`);
   };
 
   const getStatusColor = (status) => {
@@ -269,6 +358,28 @@ const RadioRegistry = () => {
                   />
                 </div>
                 <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Radio ID
+                    </label>
+                    <div className="relative group">
+                      <FileText className="w-4 h-4 text-slate-400 cursor-help" />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap z-10">
+                        Turn on the radio and observe the 5-digit number it displays
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    name="radio_id"
+                    value={formData.radio_id}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white shadow-sm transition-all font-mono font-medium"
+                    placeholder="e.g., 12345"
+                    maxLength="5"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Model <span className="text-red-500">*</span>
                   </label>
@@ -278,7 +389,7 @@ const RadioRegistry = () => {
                     value={formData.model}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white shadow-sm transition-all font-medium"
-                    placeholder="e.g., Motorola CP200"
+                    placeholder="e.g., Tait TP9300"
                     required
                   />
                 </div>
@@ -353,17 +464,7 @@ const RadioRegistry = () => {
                     placeholder="Building, area"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Site Code</label>
-                  <input
-                    type="text"
-                    name="site_code"
-                    value={formData.site_code}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-violet-500 bg-white shadow-sm transition-all font-mono font-medium uppercase"
-                    placeholder="MINE01"
-                  />
-                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Shift</label>
                   <select
@@ -437,14 +538,20 @@ const RadioRegistry = () => {
             Quick Actions
           </h3>
           <div className="space-y-3">
-            <button className="w-full p-3 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200 rounded-xl text-left transition-all">
+            <button 
+              onClick={() => setShowBulkImport(true)}
+              className="w-full p-3 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200 rounded-xl text-left transition-all"
+            >
               <div className="flex items-center">
                 <CheckCircle className="w-4 h-4 text-emerald-600 mr-3" />
                 <span className="font-medium text-slate-900">Bulk Import</span>
               </div>
               <p className="text-xs text-slate-600 ml-7">Import multiple radios</p>
             </button>
-            <button className="w-full p-3 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-xl text-left transition-all">
+            <button 
+              onClick={() => setShowTemplates(true)}
+              className="w-full p-3 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-xl text-left transition-all"
+            >
               <div className="flex items-center">
                 <Settings className="w-4 h-4 text-blue-600 mr-3" />
                 <span className="font-medium text-slate-900">Templates</span>
@@ -540,6 +647,134 @@ const RadioRegistry = () => {
                 </button>
                 <button
                   onClick={() => setShowDuplicateModal(false)}
+                  className="w-full px-6 py-4 border-2 border-slate-300 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-all duration-200 shadow-sm hover:shadow-md"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Modal */}
+      {showBulkImport && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-8 py-6">
+              <div className="flex items-center justify-between text-white">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold">Bulk Import</h3>
+                    <p className="text-emerald-100">Import multiple radios from CSV data</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowBulkImport(false)}
+                  className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8">
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-slate-900 mb-2">CSV Format</h4>
+                <p className="text-sm text-slate-600 mb-4">
+                  Enter one radio per line with comma-separated values in this order:
+                </p>
+                <div className="bg-slate-100 rounded-lg p-4 font-mono text-sm text-slate-700">
+                  Serial Number, Radio ID, Model, Version, User, Department, Location, Shift, Status, Notes
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Example: MTR001, 12345, Tait TP9300, v3.0, John Smith, Operations, Pit Area, Day Shift, active, Handheld radio
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Paste CSV Data</label>
+                <textarea
+                  value={bulkData}
+                  onChange={(e) => setBulkData(e.target.value)}
+                  rows={10}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white shadow-sm transition-all font-mono text-sm resize-none"
+                  placeholder="MTR001, 12345, Tait TP9300, v3.0, John Smith, Operations, Pit Area, Day Shift, active, Handheld radio&#10;MTR002, 12346, Tait TM9300, v3.0, Jane Doe, Security, Gate House, Night Shift, active, Vehicle mounted radio"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleBulkImport}
+                  disabled={loading || !bulkData.trim()}
+                  className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white py-4 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Importing...' : 'Import Radios'}
+                </button>
+                <button
+                  onClick={() => setShowBulkImport(false)}
+                  className="w-full px-6 py-4 border-2 border-slate-300 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-all duration-200 shadow-sm hover:shadow-md"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Templates Modal */}
+      {showTemplates && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
+              <div className="flex items-center justify-between text-white">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                    <Settings className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold">Equipment Templates</h3>
+                    <p className="text-blue-100">Choose a preset configuration</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowTemplates(false)}
+                  className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8">
+              <div className="space-y-4">
+                {templates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => handleUseTemplate(template)}
+                    className="w-full p-6 border-2 border-slate-200 hover:border-blue-300 rounded-xl text-left transition-all hover:shadow-lg hover:bg-blue-50"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                        <Radio className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-lg font-bold text-slate-900 mb-1">{template.name}</h4>
+                        <p className="text-sm text-slate-600 mb-2">{template.model} - {template.version}</p>
+                        <p className="text-xs text-slate-500">{template.notes}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowTemplates(false)}
                   className="w-full px-6 py-4 border-2 border-slate-300 text-slate-700 rounded-xl font-semibold hover:bg-slate-50 transition-all duration-200 shadow-sm hover:shadow-md"
                 >
                   Cancel

@@ -1,4 +1,4 @@
-# 📻⛏️ Mining Radio Registry System
+# 📻⛏️ CommLink Pro - Enterprise Communication Management
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D14.0.0-brightgreen)](https://nodejs.org/)
@@ -76,6 +76,23 @@ npm run dev
 ```
 
 Then open `http://localhost:3000` in your browser! 🎉
+
+## 🆕 **Version 1.1.0 - Latest Updates**
+
+### ✨ **New Features:**
+- ✅ **Radio ID Field** - 5-digit display number (turn on radio to see it)
+- ✅ **Bulk Import** - CSV import for multiple radios
+- ✅ **Equipment Templates** - Preset configurations for Tait TP9300 & TM9300
+- ✅ **Enhanced Export** - Excel export with Radio ID column
+- ✅ **Improved Search** - Now searches Radio ID as well
+- ❌ **Removed Site Code** - Simplified form (not needed)
+
+### 📋 **What's New:**
+- **Radio ID with tooltip** - Hover over ℹ️ icon for instructions
+- **Functional Bulk Import** - Import multiple radios from CSV data
+- **Working Templates** - Pre-filled forms for common radio models
+- **Better Search** - Find radios by serial number OR radio ID
+- **Streamlined Forms** - Removed unnecessary site code field
 
 ### 🔧 If you get "npm is not recognized" error:
 

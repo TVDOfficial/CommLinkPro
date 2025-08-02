@@ -1,7 +1,7 @@
 {
-  "name": "radio-registry",
-  "version": "1.0.0",
-  "description": "Professional Radio Registry System",
+  "name": "commlink-pro",
+  "version": "1.1.0",
+  "description": "CommLink Pro - Enterprise Communication Management System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,6 +12,7 @@
     "install-all": "npm install && cd client && npm install",
     "setup": "node setup.js",
     "demo": "node demo-data.js",
+    "migrate": "node migrate-radio-id.js",
     "reset": "rm -f radio_registry.db && echo 'Database reset. Run npm start to recreate.'"
   },
   "dependencies": {

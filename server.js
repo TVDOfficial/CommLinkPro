@@ -107,7 +107,7 @@ function getClientIP(req) {
 
 // Get all radios with optional search and filters
 app.get('/api/radios', (req, res) => {
-  const { search, department, model, user, version, status, shift, site_code, limit } = req.query;
+  const { search, department, model, user, version, status, shift, limit } = req.query;
   let query = 'SELECT * FROM radios WHERE 1=1';
   let params = [];
 
@@ -147,10 +147,7 @@ app.get('/api/radios', (req, res) => {
     params.push(`%${shift}%`);
   }
 
-  if (site_code) {
-    query += ' AND site_code LIKE ?';
-    params.push(`%${site_code}%`);
-  }
+
 
   query += ' ORDER BY created_at DESC';
 
@@ -238,8 +235,8 @@ app.post('/api/radios', (req, res) => {
 app.put('/api/radios/:id', (req, res) => {
   const { id } = req.params;
   const { 
-    serial_number, model, version, user_name, department, location, 
-    site_code, shift, status, notes, operator_name 
+    serial_number, radio_id, model, version, user_name, department, location, 
+    shift, status, notes, operator_name 
   } = req.body;
   const clientIP = getClientIP(req);
 
@@ -260,24 +257,24 @@ app.put('/api/radios/:id', (req, res) => {
 
     // Update radio
     db.run(
-      `UPDATE radios SET serial_number = ?, model = ?, version = ?, user_name = ?, 
-       department = ?, location = ?, site_code = ?, shift = ?, status = ?, 
+      `UPDATE radios SET serial_number = ?, radio_id = ?, model = ?, version = ?, user_name = ?, 
+       department = ?, location = ?, shift = ?, status = ?, 
        notes = ?, operator_name = ?, updated_at = CURRENT_TIMESTAMP 
        WHERE id = ?`,
-      [serial_number, model, version, user_name, department, location, 
-       site_code, shift, status, notes, operator_name, id],
+      [serial_number, radio_id, model, version, user_name, department, location, 
+       shift, status, notes, operator_name, id],
       function(err) {
         if (err) {
           console.error('Error updating radio:', err.message);
           res.status(500).json({ error: 'Internal server error' });
         } else {
           const changes = [];
+          if (originalRadio.radio_id !== radio_id) changes.push(`radio_id: ${originalRadio.radio_id} → ${radio_id}`);
           if (originalRadio.model !== model) changes.push(`model: ${originalRadio.model} → ${model}`);
           if (originalRadio.version !== version) changes.push(`version: ${originalRadio.version} → ${version}`);
           if (originalRadio.user_name !== user_name) changes.push(`user: ${originalRadio.user_name} → ${user_name}`);
           if (originalRadio.department !== department) changes.push(`department: ${originalRadio.department} → ${department}`);
           if (originalRadio.location !== location) changes.push(`location: ${originalRadio.location} → ${location}`);
-          if (originalRadio.site_code !== site_code) changes.push(`site: ${originalRadio.site_code} → ${site_code}`);
           if (originalRadio.shift !== shift) changes.push(`shift: ${originalRadio.shift} → ${shift}`);
           if (originalRadio.status !== status) changes.push(`status: ${originalRadio.status} → ${status}`);
           
@@ -332,6 +329,7 @@ app.get('/api/export', (req, res) => {
       // Format data for Excel with mining-specific fields
       const exportData = rows.map(row => ({
         'Serial Number': row.serial_number,
+        'Radio ID': row.radio_id || '',
         'Model': row.model,
         'Version': row.version || '',
         'Status': row.status || 'Active',
@@ -339,7 +337,6 @@ app.get('/api/export', (req, res) => {
         'Department': row.department || '',
         'Shift': row.shift || '',
         'Location': row.location || '',
-        'Site Code': row.site_code || '',
         'Notes': row.notes || '',
         'Last Updated By': row.operator_name || '',
         'Created Date': moment(row.created_at).format('YYYY-MM-DD HH:mm:ss'),
@@ -437,6 +434,111 @@ app.get('/api/stats', (req, res) => {
       }
     );
   });
+});
+
+// Bulk import radios
+app.post('/api/radios/bulk', (req, res) => {
+  const { radios, operator_name } = req.body;
+  const clientIP = getClientIP(req);
+
+  if (!operator_name) {
+    return res.status(400).json({ error: 'Operator name is required for bulk import' });
+  }
+
+  if (!radios || !Array.isArray(radios) || radios.length === 0) {
+    return res.status(400).json({ error: 'Radios array is required and must not be empty' });
+  }
+
+  let successCount = 0;
+  let errorCount = 0;
+  const errors = [];
+
+  const processRadio = (radio, index) => {
+    return new Promise((resolve) => {
+      const { serial_number, radio_id, model, version, user_name, department, location, shift, status, notes } = radio;
+      
+      if (!serial_number || !model) {
+        errors.push(`Row ${index + 1}: Serial number and model are required`);
+        errorCount++;
+        resolve();
+        return;
+      }
+
+      const id = uuidv4();
+      
+      // Check for duplicate
+      db.get('SELECT * FROM radios WHERE serial_number = ?', [serial_number], (err, existingRadio) => {
+        if (err) {
+          errors.push(`Row ${index + 1}: Database error checking for duplicate`);
+          errorCount++;
+          resolve();
+          return;
+        }
+
+        if (existingRadio) {
+          errors.push(`Row ${index + 1}: Radio ${serial_number} already exists`);
+          errorCount++;
+          resolve();
+          return;
+        }
+
+        // Insert new radio
+        db.run(
+          `INSERT INTO radios (id, serial_number, radio_id, model, version, user_name, department, location, 
+                              shift, status, notes, operator_name, created_by_ip) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, serial_number, radio_id, model, version, user_name, department, location, 
+           shift, status || 'active', notes, operator_name, clientIP],
+          function(err) {
+            if (err) {
+              errors.push(`Row ${index + 1}: Error inserting radio ${serial_number}`);
+              errorCount++;
+            } else {
+              logAction('ADD', id, serial_number, `Bulk import: Added radio ${model}`, operator_name, clientIP);
+              successCount++;
+            }
+            resolve();
+          }
+        );
+      });
+    });
+  };
+
+  // Process all radios
+  Promise.all(radios.map(processRadio)).then(() => {
+    logAction('BULK_IMPORT', null, null, `Bulk import completed: ${successCount} success, ${errorCount} errors`, operator_name, clientIP);
+    
+    res.json({
+      message: 'Bulk import completed',
+      successCount,
+      errorCount,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  });
+});
+
+// Get radio templates
+app.get('/api/templates', (req, res) => {
+  const templates = [
+    {
+      id: 'tait-tp9300',
+      name: 'Tait TP9300 (Handheld)',
+      model: 'Tait TP9300',
+      version: 'v3.0',
+      status: 'active',
+      notes: 'Standard handheld radio for field operations'
+    },
+    {
+      id: 'tait-tm9300',
+      name: 'Tait TM9300 (Vehicle Mounted)',
+      model: 'Tait TM9300',
+      version: 'v3.0',
+      status: 'active',
+      notes: 'Vehicle-mounted radio for mobile operations'
+    }
+  ];
+  
+  res.json(templates);
 });
 
 // Serve static files from React build (production)

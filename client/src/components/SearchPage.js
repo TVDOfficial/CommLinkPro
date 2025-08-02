@@ -32,8 +32,7 @@ const SearchPage = () => {
   const [filters, setFilters] = useState({
     department: '',
     status: '',
-    shift: '',
-    site_code: ''
+    shift: ''
   });
 
   useEffect(() => {
@@ -62,11 +61,11 @@ const SearchPage = () => {
       const term = searchTerm.toLowerCase();
       const matchesSearch = (
         radio.serial_number.toLowerCase().includes(term) ||
+        (radio.radio_id && radio.radio_id.toLowerCase().includes(term)) ||
         radio.model.toLowerCase().includes(term) ||
         (radio.user_name && radio.user_name.toLowerCase().includes(term)) ||
         (radio.department && radio.department.toLowerCase().includes(term)) ||
-        (radio.location && radio.location.toLowerCase().includes(term)) ||
-        (radio.site_code && radio.site_code.toLowerCase().includes(term))
+        (radio.location && radio.location.toLowerCase().includes(term))
       );
       if (!matchesSearch) return false;
     }
@@ -79,9 +78,6 @@ const SearchPage = () => {
     
     // Filter by shift
     if (filters.shift && radio.shift !== filters.shift) return false;
-    
-    // Filter by site code
-    if (filters.site_code && radio.site_code !== filters.site_code) return false;
 
     return true;
   });
@@ -149,7 +145,6 @@ const SearchPage = () => {
   const departments = [...new Set(radios.map(r => r.department).filter(Boolean))];
   const statuses = [...new Set(radios.map(r => r.status).filter(Boolean))];
   const shifts = [...new Set(radios.map(r => r.shift).filter(Boolean))];
-  const siteCodes = [...new Set(radios.map(r => r.site_code).filter(Boolean))];
 
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
@@ -184,7 +179,7 @@ const SearchPage = () => {
             <Search className="absolute left-4 top-half transform -translate-y-half w-5 h-5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by serial number, model, user, department, location..."
+              placeholder="Search by serial number, radio ID, model, user, department, location..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-12 py-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white shadow-sm transition-all font-medium text-lg"
@@ -284,24 +279,12 @@ const SearchPage = () => {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Site Code</label>
-                  <select
-                    value={filters.site_code}
-                    onChange={(e) => setFilters(prev => ({ ...prev, site_code: e.target.value }))}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm transition-all font-medium"
-                  >
-                    <option value="">All Sites</option>
-                    {siteCodes.map(site => (
-                      <option key={site} value={site}>{site}</option>
-                    ))}
-                  </select>
-                </div>
+
               </div>
               {activeFiltersCount > 0 && (
                 <div className="mt-4 pt-4 border-t border-slate-200">
                   <button
-                    onClick={() => setFilters({ department: '', status: '', shift: '', site_code: '' })}
+                    onClick={() => setFilters({ department: '', status: '', shift: '' })}
                     className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                   >
                     Clear all filters
@@ -368,10 +351,10 @@ const SearchPage = () => {
                           <span><strong>Location:</strong> {radio.location}</span>
                         </div>
                       )}
-                      {radio.site_code && (
+                      {radio.radio_id && (
                         <div className="flex items-center space-x-2 text-slate-600">
                           <Radio className="w-4 h-4" />
-                          <span><strong>Site:</strong> {radio.site_code}</span>
+                          <span><strong>Radio ID:</strong> {radio.radio_id}</span>
                         </div>
                       )}
                     </div>
@@ -469,12 +452,12 @@ const SearchPage = () => {
                     <p className="text-lg font-bold text-slate-900">{selectedRadio.location}</p>
                   </div>
                 )}
-                {selectedRadio.site_code && (
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-500 mb-1">Site Code</label>
-                    <p className="text-lg font-bold text-slate-900 font-mono">{selectedRadio.site_code}</p>
-                  </div>
-                )}
+                              {selectedRadio.radio_id && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-500 mb-1">Radio ID</label>
+                  <p className="text-lg font-bold text-slate-900 font-mono">{selectedRadio.radio_id}</p>
+                </div>
+              )}
                 {selectedRadio.shift && (
                   <div>
                     <label className="block text-sm font-semibold text-slate-500 mb-1">Shift</label>
